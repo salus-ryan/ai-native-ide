@@ -44,12 +44,19 @@ class MetricsCollector {
     stats.avgTokensPerSec = stats.totalTokens / (stats.totalDuration / 1000);
     
     // Calculate cost based on OpenRouter pricing
-    // We'll need to get the model's pricing info from the registry
-    const model = globalRegistry?.getModel(modelId);
+    const model = registry.getModel(modelId);
     if (model?.pricing) {
-      const promptCost = (inputTokens / 1000) * model.pricing.prompt;
-      const completionCost = (outputTokens / 1000) * (model.pricing.completion || model.pricing.prompt);
+      // Convert to per-1000 tokens pricing
+      const promptCost = (inputTokens / 1000) * parseFloat(model.pricing.prompt);
+      const completionCost = (outputTokens / 1000) * parseFloat(model.pricing.completion || model.pricing.prompt);
       stats.totalCost += (promptCost + completionCost);
+      
+      // Store the rates for reference
+      stats.pricing = {
+        prompt: parseFloat(model.pricing.prompt),
+        completion: parseFloat(model.pricing.completion || model.pricing.prompt),
+        unit: 'USD per 1000 tokens'
+      };
     }
   }
 
@@ -90,6 +97,9 @@ class MetricsCollector {
 
 // Global metrics collector instance
 const metrics = new MetricsCollector();
+
+// Global model registry instance
+const registry = new ModelRegistry();
 
 // ============================================================================
 // Model Registry - Fetched from OpenRouter
@@ -314,7 +324,22 @@ RESPOND ONLY IN BRAILLE. No English text.`;
       // Record metrics
       const inputTokens = data.usage?.prompt_tokens || 0;
       const outputTokens = data.usage?.completion_tokens || 0;
+      
+      // Get actual cost from OpenRouter headers if available
+      const actualCost = response.headers.get('x-openrouter-cost') || 
+                        response.headers.get('openrouter-cost');
+      
       metrics.recordCall(this.modelId, inputTokens, outputTokens, duration);
+      
+      // Include metrics in the response
+      this.lastResponse.metrics = {
+        duration,
+        inputTokens,
+        outputTokens,
+        totalTokens: data.usage?.total_tokens,
+        cost: actualCost ? parseFloat(actualCost) : undefined,
+        tokensPerSecond: data.usage?.total_tokens / (duration / 1000)
+      };
       
       this.stats.tokens += data.usage?.total_tokens || 0;
       
@@ -435,7 +460,9 @@ class BrailleSwarm extends EventEmitter {
 
   async initialize() {
     console.log('[BrailleSwarm] Fetching available models from OpenRouter...');
+    // Update both the instance registry and global registry
     await this.registry.fetchModels();
+    await registry.fetchModels();
     
     const stats = this.registry.getStats();
     console.log(`[BrailleSwarm] Found ${stats.total} models`);
@@ -643,6 +670,19 @@ class BrailleSwarm extends EventEmitter {
       registry: this.registry.getStats(),
       activeAgents: this.agents.size,
       agentStats,
+      metrics: metrics.getSummary(),
+      modelMetrics: metrics.getMetrics()
+    };
+  }
+
+  // Get detailed OpenRouter API metrics
+  getMetrics(modelId = null) {
+    if (modelId) {
+      return metrics.getMetrics(modelId);
+    }
+    return {
+      summary: metrics.getSummary(),
+      models: metrics.getMetrics()
     };
   }
 
@@ -665,6 +705,8 @@ module.exports = {
   ModelRegistry,
   SwarmAgent,
   BrailleSwarm,
+  MetricsCollector,
+  metrics,
   toBraille,
   fromBraille,
 };

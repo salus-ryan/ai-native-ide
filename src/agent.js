@@ -8,6 +8,7 @@
 const { TOOL_DEFINITIONS, AriaTools } = require('./tools');
 const { createLLMClient, ARIA_SYSTEM_PROMPT } = require('./llm.cjs');
 const { ContextManager, estimateHistoryTokens } = require('./compaction');
+const { ConversationStore } = require('./conversation-store');
 
 const ARIA_AGENT_PROMPT = `${ARIA_SYSTEM_PROMPT}
 
@@ -39,6 +40,17 @@ class AriaAgent {
     this.onToolResult = options.onToolResult || (() => {});
     this.onCompaction = options.onCompaction || (() => {});
     
+    // Unique conversation ID 
+    this.conversationId = options.conversationId || 
+      `conv_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    
+    // Persistent conversation store with braille compaction
+    this.store = new ConversationStore({
+      storageDir: options.storageDir,
+      maxSize: options.maxConversationSize || 1000000,
+      compactionThreshold: options.compactionThreshold || 0.7
+    });
+    
     // Context compaction
     this.contextManager = new ContextManager({
       maxTokens: options.maxTokens || 100000,
@@ -47,6 +59,9 @@ class AriaAgent {
       llmClient: this.llm,
       autoCompact: options.autoCompact !== false,
     });
+
+    // Initialize store and load existing conversation if available
+    this.initialized = false;
   }
 
   async maybeCompact() {
@@ -54,6 +69,9 @@ class AriaAgent {
       const result = await this.contextManager.compact(this.conversationHistory);
       if (result.compacted) {
         this.conversationHistory = result.history;
+        // Persist compacted history
+        await this.store.saveConversation(this.conversationId, this.conversationHistory);
+        
         this.onCompaction({
           tokensBefore: result.tokensBefore,
           tokensAfter: result.tokensAfter,
@@ -71,7 +89,27 @@ class AriaAgent {
     };
   }
 
+  async initialize() {
+    if (this.initialized) return;
+    
+    // Initialize conversation store
+    await this.store.initialize();
+    
+    // Load existing conversation if available
+    const history = await this.store.getConversation(this.conversationId);
+    if (history) {
+      this.conversationHistory = history;
+      await this.maybeCompact(); // Compact if needed
+    }
+    
+    this.initialized = true;
+  }
+
   async chat(userMessage) {
+    // Ensure initialized
+    if (!this.initialized) {
+      await this.initialize();
+    }
     // Add user message to history
     this.conversationHistory.push({
       role: 'user',
@@ -380,12 +418,36 @@ class AriaAgent {
     return { content: fullContent };
   }
 
-  clearHistory() {
+  async clearHistory() {
     this.conversationHistory = [];
+    await this.store.deleteConversation(this.conversationId);
   }
 
   getHistory() {
     return this.conversationHistory;
+  }
+
+  async getAllConversations() {
+    return this.store.getAllConversations();
+  }
+
+  async loadConversation(conversationId) {
+    const history = await this.store.getConversation(conversationId);
+    if (history) {
+      this.conversationId = conversationId;
+      this.conversationHistory = history;
+      await this.maybeCompact();
+      return true;
+    }
+    return false;
+  }
+
+  getConversationStats() {
+    return {
+      ...this.getContextStats(),
+      ...this.store.getStats(),
+      currentConversationId: this.conversationId
+    };
   }
 
   /**
