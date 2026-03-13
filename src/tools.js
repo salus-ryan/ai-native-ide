@@ -10,6 +10,7 @@ const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const { WorldModelTools, WORLD_MODEL_TOOLS } = require('./world-model');
 const { BraidedLLMTools, BRAIDED_LLM_TOOLS } = require('./braided-llm');
+const { IntrospectTools, INTROSPECT_TOOLS } = require('./introspect');
 
 const execAsync = promisify(exec);
 
@@ -240,6 +241,8 @@ const TOOL_DEFINITIONS = [
   ...WORLD_MODEL_TOOLS,
   // Add Braided LLM tools
   ...BRAIDED_LLM_TOOLS,
+  // Add Introspection tools (self-awareness)
+  ...INTROSPECT_TOOLS,
 ];
 
 // ============================================================================
@@ -253,6 +256,7 @@ class AriaTools {
     this.page = null;    // Current page
     this.worldModel = new WorldModelTools(options.worldModelPath);
     this.braidedLLM = new BraidedLLMTools(options.apiKey || process.env.OPENROUTER_API_KEY);
+    this.introspect = new IntrospectTools();
   }
 
   async initBrowser() {
@@ -462,6 +466,11 @@ class AriaTools {
     // Check if it's a braided LLM tool
     if (toolName.startsWith('braided_') || toolName === 'text_to_braille' || toolName === 'braille_to_text') {
       return this.braidedLLM.execute(toolName, params);
+    }
+    
+    // Check if it's an introspection tool
+    if (toolName.startsWith('introspect_')) {
+      return this.introspect.execute(toolName, params);
     }
     
     const method = this[toolName];

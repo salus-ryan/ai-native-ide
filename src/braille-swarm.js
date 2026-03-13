@@ -6,34 +6,90 @@
  */
 
 const EventEmitter = require('events');
+const { BRAILLE_BASE, toBraille, fromBraille } = require('./braille');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const BRAILLE_BASE = 0x2800;
 
 // ============================================================================
-// Braille Encoding
+// OpenRouter Metrics Collection
 // ============================================================================
 
-function toBraille(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(text);
-  let result = '';
-  for (const byte of bytes) {
-    result += String.fromCodePoint(BRAILLE_BASE + byte);
+class MetricsCollector {
+  constructor() {
+    this.metrics = new Map();
+    this.startTime = Date.now();
   }
-  return result;
-}
 
-function fromBraille(braille) {
-  const bytes = [];
-  for (const char of braille) {
-    const cp = char.codePointAt(0);
-    if (cp >= BRAILLE_BASE && cp <= BRAILLE_BASE + 255) {
-      bytes.push(cp - BRAILLE_BASE);
+  recordCall(modelId, inputTokens, outputTokens, duration) {
+    if (!this.metrics.has(modelId)) {
+      this.metrics.set(modelId, {
+        calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        totalDuration: 0,
+        avgTokensPerSec: 0
+      });
+    }
+
+    const stats = this.metrics.get(modelId);
+    stats.calls++;
+    stats.inputTokens += inputTokens;
+    stats.outputTokens += outputTokens;
+    stats.totalTokens += (inputTokens + outputTokens);
+    stats.totalDuration += duration;
+    
+    // Calculate tokens per second
+    stats.avgTokensPerSec = stats.totalTokens / (stats.totalDuration / 1000);
+    
+    // Calculate cost based on OpenRouter pricing
+    // We'll need to get the model's pricing info from the registry
+    const model = globalRegistry?.getModel(modelId);
+    if (model?.pricing) {
+      const promptCost = (inputTokens / 1000) * model.pricing.prompt;
+      const completionCost = (outputTokens / 1000) * (model.pricing.completion || model.pricing.prompt);
+      stats.totalCost += (promptCost + completionCost);
     }
   }
-  return new TextDecoder().decode(new Uint8Array(bytes));
+
+  getMetrics(modelId = null) {
+    if (modelId) {
+      return this.metrics.get(modelId);
+    }
+    return Object.fromEntries(this.metrics);
+  }
+
+  getSummary() {
+    let total = {
+      calls: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      totalDuration: 0
+    };
+
+    for (const stats of this.metrics.values()) {
+      total.calls += stats.calls;
+      total.inputTokens += stats.inputTokens;
+      total.outputTokens += stats.outputTokens;
+      total.totalTokens += stats.totalTokens;
+      total.totalCost += stats.totalCost;
+      total.totalDuration += stats.totalDuration;
+    }
+
+    return {
+      ...total,
+      avgTokensPerSec: total.totalTokens / (total.totalDuration / 1000),
+      uptime: Date.now() - this.startTime,
+      modelsUsed: this.metrics.size
+    };
+  }
 }
+
+// Global metrics collector instance
+const metrics = new MetricsCollector();
 
 // ============================================================================
 // Model Registry - Fetched from OpenRouter
@@ -217,6 +273,7 @@ RESPOND ONLY IN BRAILLE. No English text.`;
     
     this.busy = true;
     this.stats.calls++;
+    const startTime = Date.now();
     
     try {
       // ALWAYS encode the message to braille
@@ -252,6 +309,13 @@ RESPOND ONLY IN BRAILLE. No English text.`;
       }
       
       const content = data.choices?.[0]?.message?.content || '';
+      const duration = Date.now() - startTime;
+      
+      // Record metrics
+      const inputTokens = data.usage?.prompt_tokens || 0;
+      const outputTokens = data.usage?.completion_tokens || 0;
+      metrics.recordCall(this.modelId, inputTokens, outputTokens, duration);
+      
       this.stats.tokens += data.usage?.total_tokens || 0;
       
       this.history.push({ role: 'user', content: brailleMessage });

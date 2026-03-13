@@ -6,17 +6,17 @@
  * - Monaco code editor
  * - Integrated terminal
  * - Chat with Aria
- * - Diff view for AI changes
+ * - Braille encoding for multi-model fusion
  */
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-const ARIA_SERVER = 'http://localhost:3200';
-const BRAILLE_WS_URL = 'ws://localhost:3201';
-const HOME_DIR = '/Users/ryanbarrett';
-let currentBrowsePath = HOME_DIR; // Start at home, not just project
+const ARIA_SERVER = window.location.origin; // Same server serves API + UI
+const BRAILLE_WS_URL = `ws://${window.location.hostname}:3201`;
+const HOME_DIR = null; // Resolved from server via /browse endpoint
+let currentBrowsePath = null; // Will be set on first /browse call
 
 // Braille WebSocket connection
 let brailleWS = null;
@@ -27,11 +27,8 @@ let brailleWSConnected = false;
 // ============================================================================
 
 let editor = null;
-let diffEditor = null;
 let currentFile = null;
 let openFiles = new Map(); // path -> { content, modified }
-let pendingChanges = []; // AI-proposed changes
-let currentDiffIndex = null;
 
 // ============================================================================
 // Monaco Editor Setup
@@ -105,7 +102,10 @@ async function loadFileTree(browsePath = null) {
   updatePathDisplay();
 
   try {
-    const response = await fetch(`${ARIA_SERVER}/browse?path=${encodeURIComponent(currentBrowsePath)}`);
+    const browseUrl = currentBrowsePath 
+      ? `${ARIA_SERVER}/browse?path=${encodeURIComponent(currentBrowsePath)}`
+      : `${ARIA_SERVER}/browse`;
+    const response = await fetch(browseUrl);
     if (!response.ok) throw new Error('Failed to load files');
     
     const data = await response.json();
@@ -131,12 +131,9 @@ function updatePathDisplay() {
   const pathEl = document.getElementById('currentPath');
   if (pathEl) {
     // Show shortened path
-    let displayPath = currentBrowsePath;
-    if (displayPath.startsWith(HOME_DIR)) {
-      displayPath = '~' + displayPath.slice(HOME_DIR.length);
-    }
+    let displayPath = currentBrowsePath || '~';
     pathEl.textContent = displayPath;
-    pathEl.title = currentBrowsePath;
+    pathEl.title = currentBrowsePath || 'Home';
   }
 }
 
@@ -175,10 +172,19 @@ function navigateToPath(path) {
 }
 
 function goHome() {
-  loadFileTree(HOME_DIR);
+  currentBrowsePath = null;
+  loadFileTree();
 }
 
 function goToProject(projectPath) {
+  // Default to the project root (detected from server)
+  if (!projectPath) {
+    fetch(`${ARIA_SERVER}/workspace`)
+      .then(r => r.json())
+      .then(data => loadFileTree(data.root || data.path))
+      .catch(() => loadFileTree());
+    return;
+  }
   loadFileTree(projectPath);
 }
 
@@ -494,22 +500,31 @@ async function sendChatMessage() {
           try {
             const data = JSON.parse(line.slice(6));
             
-            if (data.type === 'content') {
+            if (data.type === 'chunk') {
               assistantMessage += data.content;
               if (!messageEl) {
                 messageEl = appendChatMessage('assistant', assistantMessage);
               } else {
-                messageEl.textContent = assistantMessage;
+                updateChatMessage(messageEl, assistantMessage);
               }
             } else if (data.type === 'tool_call') {
-              appendChatMessage('tool', `🔧 ${data.name}: ${JSON.stringify(data.args).slice(0, 100)}...`);
-              
-              // Handle file edits
-              if (data.name === 'write_file' || data.name === 'edit_file') {
-                addPendingChange(data.args);
+              appendChatMessage('tool', `🔧 ${data.name}: ${JSON.stringify(data.arguments || data.args || {}).slice(0, 100)}`);
+              // Auto-refresh file tree and editor on file operations
+              if (['write_file', 'edit_file', 'delete_file'].includes(data.name)) {
+                setTimeout(() => {
+                  loadFileTree();
+                  // Reload current file if Aria edited it
+                  const toolArgs = data.arguments || data.args || {};
+                  if (toolArgs.path && openFiles.has(toolArgs.path)) {
+                    openFiles.delete(toolArgs.path);
+                    openFile(toolArgs.path);
+                  }
+                }, 500);
               }
             } else if (data.type === 'tool_result') {
-              appendChatMessage('tool', `✓ ${data.result?.slice?.(0, 100) || 'Done'}`);
+              appendChatMessage('tool', `✓ ${data.preview?.slice?.(0, 100) || 'Done'}`);
+            } else if (data.type === 'done') {
+              // Final response received — do nothing, message is already displayed
             }
           } catch (e) {
             // Ignore parse errors
@@ -636,6 +651,30 @@ function appendChatMessage(role, content, images = []) {
   messages.appendChild(msg);
   messages.scrollTop = messages.scrollHeight;
   return msg.querySelector('.chat-text') || msg;
+}
+
+function updateChatMessage(el, content) {
+  // el is the .chat-text element returned by appendChatMessage
+  const msg = el.closest('.chat-message');
+  if (!msg) { el.textContent = content; return; }
+  
+  // Update braille display if present
+  const brailleEl = msg.querySelector('.chat-braille');
+  if (brailleEl) brailleEl.textContent = toBraille(content);
+  
+  // Update text
+  const textEl = msg.querySelector('.chat-text');
+  if (textEl) {
+    if (textEl.classList.contains('chat-translation')) {
+      textEl.innerHTML = `<span class="translation-label">⟶ English:</span> ${escapeHtml(content)}`;
+    } else {
+      textEl.textContent = content;
+    }
+  }
+  
+  // Auto-scroll
+  const messages = document.getElementById('chatMessages');
+  if (messages) messages.scrollTop = messages.scrollHeight;
 }
 
 function toggleBrailleMode() {
@@ -1124,238 +1163,9 @@ function openImagePicker() {
 window.removeImage = removeImage;
 window.openImagePicker = openImagePicker;
 
-// ============================================================================
-// Pending Changes (Diff View)
-// ============================================================================
-
-function addPendingChange(change) {
-  // Get original content if it's an edit
-  if (change.path && !change.originalContent) {
-    const fileState = openFiles.get(change.path);
-    if (fileState) {
-      change.originalContent = fileState.content;
-    }
-  }
-  
-  pendingChanges.push(change);
-  renderPendingChanges();
-  updatePendingCount();
-  
-  // Switch to diff panel and show the diff
-  document.querySelector('[data-panel="diff"]').click();
-  showDiffView(pendingChanges.length - 1);
-}
-
-function updatePendingCount() {
-  const badge = document.getElementById('pendingCount');
-  if (badge) {
-    badge.textContent = pendingChanges.length;
-    badge.style.display = pendingChanges.length > 0 ? 'inline' : 'none';
-  }
-}
-
-function renderPendingChanges() {
-  const list = document.getElementById('diffList');
-  
-  if (pendingChanges.length === 0) {
-    list.innerHTML = '<div class="no-changes">No pending changes</div>';
-    hideDiffEditor();
-    return;
-  }
-  
-  list.innerHTML = pendingChanges.map((change, index) => `
-    <div class="diff-item ${currentDiffIndex === index ? 'selected' : ''}" data-index="${index}" onclick="showDiffView(${index})">
-      <div class="diff-item-header">
-        <span class="change-type ${change.content ? 'new' : 'edit'}">${change.content ? 'NEW' : 'EDIT'}</span>
-        <span class="filename">${change.path || 'unknown'}</span>
-      </div>
-      <div class="diff-summary">
-        ${getDiffSummary(change)}
-      </div>
-    </div>
-  `).join('');
-}
-
-function getDiffSummary(change) {
-  if (change.content) {
-    const lines = change.content.split('\n').length;
-    return `<span class="add-count">+${lines} lines</span> (new file)`;
-  }
-  if (change.old_string && change.new_string) {
-    const oldLines = change.old_string.split('\n').length;
-    const newLines = change.new_string.split('\n').length;
-    return `<span class="remove-count">-${oldLines}</span> <span class="add-count">+${newLines}</span>`;
-  }
-  return 'Unknown change';
-}
-
 function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-
-function showDiffView(index) {
-  currentDiffIndex = index;
-  const change = pendingChanges[index];
-  if (!change) return;
-  
-  // Update selection in list
-  document.querySelectorAll('.diff-item').forEach((el, i) => {
-    el.classList.toggle('selected', i === index);
-  });
-  
-  // Show diff editor
-  const diffContainer = document.getElementById('diffEditorContainer');
-  const diffActions = document.getElementById('diffActions');
-  diffContainer.style.display = 'block';
-  diffActions.style.display = 'flex';
-  
-  // Update file info
-  document.getElementById('diffFileName').textContent = change.path || 'New File';
-  
-  // Get original and modified content
-  let originalContent = '';
-  let modifiedContent = '';
-  
-  if (change.content) {
-    // New file
-    originalContent = '';
-    modifiedContent = change.content;
-  } else if (change.old_string && change.new_string) {
-    // Edit - show context
-    originalContent = change.originalContent || change.old_string;
-    modifiedContent = originalContent.replace(change.old_string, change.new_string);
-  }
-  
-  // Create or update diff editor
-  if (!diffEditor) {
-    diffEditor = monaco.editor.createDiffEditor(document.getElementById('diffEditor'), {
-      theme: 'aria-dark',
-      fontSize: 12,
-      readOnly: true,
-      renderSideBySide: true,
-      automaticLayout: true,
-      minimap: { enabled: false },
-    });
-  }
-  
-  const language = getLanguage(change.path || '');
-  diffEditor.setModel({
-    original: monaco.editor.createModel(originalContent, language),
-    modified: monaco.editor.createModel(modifiedContent, language),
-  });
-}
-
-function hideDiffEditor() {
-  const diffContainer = document.getElementById('diffEditorContainer');
-  const diffActions = document.getElementById('diffActions');
-  if (diffContainer) diffContainer.style.display = 'none';
-  if (diffActions) diffActions.style.display = 'none';
-  currentDiffIndex = null;
-}
-
-async function applyChange(index) {
-  const change = pendingChanges[index];
-  if (!change) return;
-  
-  try {
-    let content;
-    if (change.content) {
-      // New file
-      content = change.content;
-    } else if (change.old_string && change.new_string) {
-      // Edit existing file
-      const originalContent = change.originalContent || '';
-      content = originalContent.replace(change.old_string, change.new_string);
-    }
-    
-    const response = await fetch(`${ARIA_SERVER}/file`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: change.path, content }),
-    });
-    
-    if (response.ok) {
-      pendingChanges.splice(index, 1);
-      renderPendingChanges();
-      updatePendingCount();
-      setStatus(`✓ Applied change to ${change.path}`, 'success');
-      
-      // Reload file if it's open
-      if (openFiles.has(change.path)) {
-        openFiles.delete(change.path);
-        openFile(change.path);
-      }
-      
-      // Refresh file tree
-      loadFileTree();
-      
-      // Show next diff or hide
-      if (pendingChanges.length > 0) {
-        showDiffView(Math.min(index, pendingChanges.length - 1));
-      } else {
-        hideDiffEditor();
-      }
-    }
-  } catch (e) {
-    setStatus(`Failed to apply change: ${e.message}`, 'error');
-  }
-}
-
-function rejectChange(index) {
-  pendingChanges.splice(index, 1);
-  renderPendingChanges();
-  updatePendingCount();
-  
-  if (pendingChanges.length > 0) {
-    showDiffView(Math.min(index, pendingChanges.length - 1));
-  } else {
-    hideDiffEditor();
-  }
-}
-
-function applyCurrentChange() {
-  if (currentDiffIndex !== null) {
-    applyChange(currentDiffIndex);
-  }
-}
-
-function rejectCurrentChange() {
-  if (currentDiffIndex !== null) {
-    rejectChange(currentDiffIndex);
-  }
-}
-
-async function applyAllChanges() {
-  for (let i = pendingChanges.length - 1; i >= 0; i--) {
-    await applyChange(0); // Always apply first since array shifts
-  }
-}
-
-async function rejectAllChanges() {
-  pendingChanges = [];
-  renderPendingChanges();
-  updatePendingCount();
-  hideDiffEditor();
-}
-
-document.getElementById('applyAllChanges')?.addEventListener('click', applyAllChanges);
-
-// ============================================================================
-// Sidebar Tabs
-// ============================================================================
-
-document.querySelectorAll('.sidebar-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const panel = tab.dataset.panel;
-    const sidebar = tab.closest('.sidebar');
-    
-    sidebar.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-    sidebar.querySelectorAll('.sidebar-panel').forEach(p => p.classList.remove('active'));
-    
-    tab.classList.add('active');
-    document.getElementById(`${panel}Panel`).classList.add('active');
-  });
-});
 
 // ============================================================================
 // Resize Handles
@@ -1452,13 +1262,6 @@ async function checkConnection() {
 
 window.openFile = openFile;
 window.closeTab = closeTab;
-window.applyChange = applyChange;
-window.rejectChange = rejectChange;
-window.showDiffView = showDiffView;
-window.applyCurrentChange = applyCurrentChange;
-window.rejectCurrentChange = rejectCurrentChange;
-window.applyAllChanges = applyAllChanges;
-window.rejectAllChanges = rejectAllChanges;
 window.goHome = goHome;
 window.goToProject = goToProject;
 window.loadFileTree = loadFileTree;
@@ -1470,20 +1273,6 @@ setInterval(checkConnection, 10000);
 
 // Welcome message
 appendChatMessage('assistant', "Hi! I'm Aria. I can help you write and edit code. Try asking me to create a new feature or fix a bug!");
-
-// Test function to demo the diff view
-window.testDiffView = function() {
-  addPendingChange({
-    path: 'test/hello.js',
-    content: `// Hello World Test File
-function greet(name) {
-  return \`Hello, \${name}!\`;
-}
-
-module.exports = { greet };
-`
-  });
-};
 
 // ============================================================================
 // History / Undo / Redo

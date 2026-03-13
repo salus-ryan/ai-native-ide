@@ -23,8 +23,8 @@
         </div>
       </div>
       <div class="topbar-right">
-        <button id="undoBtn" class="icon-btn" title="Undo (Cmd+Z)" onclick="undoLastChange()" disabled>↩️</button>
-        <button id="redoBtn" class="icon-btn" title="Redo (Cmd+Shift+Z)" onclick="redoLastChange()" disabled>↪️</button>
+        <button id="undoBtn" class="icon-btn" title="Undo (Ctrl+Z)" onclick="undoLastChange()" disabled>↩️</button>
+        <button id="redoBtn" class="icon-btn" title="Redo (Ctrl+Shift+Z)" onclick="redoLastChange()" disabled>↪️</button>
         <button id="historyBtn" class="icon-btn" title="History" onclick="showHistoryPanel()">📜</button>
         <span id="connectionStatus" class="status-dot offline" title="Aria Backend"></span>
         <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
@@ -33,58 +33,30 @@
 
     <!-- Main IDE Layout -->
     <main class="ide-layout">
-      <!-- Left Sidebar: File Tree + Chat -->
+      <!-- Left Sidebar: File Tree (always visible) -->
       <aside class="sidebar left" id="leftSidebar">
-        <div class="sidebar-tabs">
-          <button class="sidebar-tab active" data-panel="files">📁 Files</button>
-          <button class="sidebar-tab" data-panel="chat">💬 Chat</button>
-        </div>
-        
-        <!-- File Tree Panel -->
-        <div class="sidebar-panel active" id="filesPanel">
-          <div class="panel-header">
-            <span>Explorer</span>
-            <div class="panel-actions">
-              <button onclick="goHome()" title="Home">🏠</button>
-              <button id="refreshFiles" title="Refresh">🔄</button>
-              <button id="newFile" title="New File">+</button>
-            </div>
-          </div>
-          <div class="path-bar">
-            <span id="currentPath" title="Current path">~</span>
-          </div>
-          <div class="quick-nav">
-            <button onclick="goToProject('/Users/ryanbarrett/ai-native-ide')" title="Aria IDE">📦 ai-native-ide</button>
-            <button onclick="goToProject('/Users/ryanbarrett/CascadeProjects')" title="Projects">📂 Projects</button>
-          </div>
-          <div class="file-tree" id="fileTree">
-            <div class="loading">Loading files...</div>
+        <div class="panel-header">
+          <span>📁 Explorer</span>
+          <div class="panel-actions">
+            <button onclick="goHome()" title="Home">🏠</button>
+            <button id="refreshFiles" title="Refresh">🔄</button>
+            <button id="newFile" title="New File">+</button>
           </div>
         </div>
-        
-        <!-- Chat Panel -->
-        <div class="sidebar-panel" id="chatPanel">
-          <div class="panel-header">
-            <span>Chat with Aria</span>
-            <button onclick="toggleBrailleMode()" title="Toggle Braille Mode" id="brailleToggle">⠃⠗</button>
-            <button id="clearChatBtn" title="Clear">🗑️</button>
-          </div>
-          <div class="chat-messages" id="chatMessages"></div>
-          <div class="chat-input-area">
-            <textarea id="chatInput" placeholder="Ask Aria to help with code... (paste images with Cmd+V)" rows="3"></textarea>
-            <div class="chat-input-actions">
-              <button onclick="openImagePicker()" class="image-btn" title="Add image (or paste with Cmd+V)">🖼️</button>
-              <button id="sendChatBtn">Send</button>
-            </div>
-          </div>
+        <div class="path-bar">
+          <span id="currentPath" title="Current path">~</span>
         </div>
-        
+        <div class="quick-nav">
+          <button onclick="goToProject()" title="Aria IDE">📦 ai-native-ide</button>
+        </div>
+        <div class="file-tree" id="fileTree">
+          <div class="loading">Loading files...</div>
+        </div>
         <div class="resize-handle vertical" data-resize="left"></div>
       </aside>
 
       <!-- Center: Editor + Terminal -->
       <section class="editor-area">
-        <!-- Editor Container -->
         <div class="editor-container" id="editorContainer">
           <div class="editor-welcome" id="editorWelcome">
             <img src="./icon.svg" alt="Aria" style="width: 80px; opacity: 0.5;" />
@@ -119,90 +91,26 @@
         </div>
       </section>
 
-      <!-- Right Sidebar: Aria Actions + Diff View -->
+      <!-- Right Sidebar: Chat (always visible, no changes panel) -->
       <aside class="sidebar right" id="rightSidebar">
-        <div class="sidebar-tabs">
-          <button class="sidebar-tab active" data-panel="actions">🎯 Actions</button>
-          <button class="sidebar-tab" data-panel="diff">📝 Changes</button>
-          <button class="sidebar-tab" data-panel="braille">⠃⠗ Braille</button>
+        <div class="panel-header">
+          <span>💬 Chat with Aria</span>
+          <button onclick="toggleBrailleMode()" title="Toggle Braille Mode" id="brailleToggle">⠃⠗</button>
+          <button id="clearChatBtn" title="Clear">🗑️</button>
         </div>
-        
-        <!-- Actions Panel -->
-        <div class="sidebar-panel active" id="actionsPanel">
-          <div class="panel-header">
-            <span>Aria Actions</span>
-          </div>
-          <div class="actions-list" id="actionsList">
-            <div class="action-item">
-              <span class="action-icon">✨</span>
-              <span>Ready to assist</span>
-            </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+          <textarea id="chatInput" placeholder="Ask Aria anything... (paste images with Ctrl+V)" rows="3"></textarea>
+          <div class="chat-input-actions">
+            <button onclick="openImagePicker()" class="image-btn" title="Add image">🖼️</button>
+            <button id="sendChatBtn">Send</button>
           </div>
         </div>
-        
-        <!-- Diff/Changes Panel -->
-        <div class="sidebar-panel" id="diffPanel">
-          <div class="panel-header">
-            <span>Pending Changes <span id="pendingCount" class="badge" style="display:none;">0</span></span>
-            <div class="panel-actions">
-              <button id="applyAllChanges" title="Apply All">✓ All</button>
-              <button onclick="rejectAllChanges()" title="Reject All">✗ All</button>
-            </div>
-          </div>
-          <div class="diff-list" id="diffList">
-            <div class="no-changes">No pending changes</div>
-          </div>
-          
-          <!-- Diff Editor (Windsurf-style) -->
-          <div id="diffEditorContainer" class="diff-editor-container" style="display: none;">
-            <div class="diff-editor-header">
-              <span id="diffFileName">file.js</span>
-              <div id="diffActions" class="diff-editor-actions">
-                <button onclick="rejectCurrentChange()" class="reject-btn">✗ Reject</button>
-                <button onclick="applyCurrentChange()" class="apply-btn">✓ Accept</button>
-              </div>
-            </div>
-            <div id="diffEditor" class="diff-editor"></div>
-          </div>
-        </div>
-        
-        <!-- Braille Swarm Panel -->
-        <div class="sidebar-panel" id="braillePanel">
-          <div class="panel-header">
-            <span>⠃⠗ Braille Swarm</span>
-            <div class="panel-actions">
-              <button onclick="document.getElementById('brailleLog').innerHTML=''" title="Clear">🗑️</button>
-            </div>
-          </div>
-          <div class="braille-log" id="brailleLog">
-            <div class="braille-log-entry system">
-              <div class="braille-raw">⠃⠗⠁⠊⠇⠇⠑⠀⠎⠺⠁⠗⠍⠀⠗⠑⠁⠙⠽</div>
-              <div class="braille-text">⟶ Braille swarm ready</div>
-            </div>
-          </div>
-          <div class="braille-input-area">
-            <input type="text" id="brailleInput" placeholder="Send to braille swarm..." />
-            <div class="braille-input-actions">
-              <select id="brailleCategory">
-                <option value="flagship">Flagship</option>
-                <option value="fast">Fast</option>
-                <option value="reasoning">Reasoning</option>
-                <option value="coding">Coding</option>
-                <option value="open">Open Source</option>
-              </select>
-              <button onclick="sendBrailleFromInput()" title="Single agent">⠎⠑⠝⠙</button>
-              <button onclick="broadcastFromInput()" title="Broadcast to category">📡</button>
-              <button onclick="consensusFromInput()" title="Consensus vote">🗳️</button>
-              <button onclick="listModels()" title="List models">�</button>
-            </div>
-          </div>
-        </div>
-        
         <div class="resize-handle vertical" data-resize="right"></div>
       </aside>
     </main>
 
-    <!-- Status Bar (Windsurf-style) -->
+    <!-- Status Bar -->
     <footer class="statusbar">
       <div class="statusbar-left">
         <span id="cursorPosition">Ln 1, Col 1</span>
@@ -240,25 +148,10 @@
               <span class="llm-name">GPT-4o</span>
               <span class="llm-badge fast">Fast</span>
             </div>
-            <div class="llm-option" data-model="openai/gpt-4-turbo">
-              <span class="llm-check"></span>
-              <span class="llm-name">GPT-4 Turbo</span>
-              <span class="llm-badge"></span>
-            </div>
             <div class="llm-option" data-model="google/gemini-pro-1.5">
               <span class="llm-check"></span>
               <span class="llm-name">Gemini 1.5 Pro</span>
               <span class="llm-badge context">1M ctx</span>
-            </div>
-            <div class="llm-option" data-model="meta-llama/llama-3.1-405b-instruct">
-              <span class="llm-check"></span>
-              <span class="llm-name">Llama 3.1 405B</span>
-              <span class="llm-badge open">Open</span>
-            </div>
-            <div class="llm-option" data-model="mistralai/mistral-large">
-              <span class="llm-check"></span>
-              <span class="llm-name">Mistral Large</span>
-              <span class="llm-badge"></span>
             </div>
             <div class="llm-option" data-model="deepseek/deepseek-chat">
               <span class="llm-check"></span>
@@ -277,7 +170,7 @@
         </span>
         <span class="statusbar-divider">|</span>
         <button class="statusbar-btn" onclick="openSettings()" title="Settings">
-          <span>⚙️</span> Windsurf Settings
+          <span>⚙️</span> Settings
         </button>
       </div>
     </footer>

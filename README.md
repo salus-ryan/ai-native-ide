@@ -1,6 +1,17 @@
-# Aria — AI Runtime Interactive Agent
+# Aria IDE — The Self-Aware AI Coding Agent
 
-This repository contains **Aria**, a working prototype of a runtime-native AI coding assistant inspired by the Playwright-Native AI IDE manifesto.
+**Aria** is an AI-native IDE where the agent is aware of her own architecture, can introspect her own source code, and operates as a runtime-native system — not just a chatbot bolted onto an editor.
+
+## What makes this different
+
+Unlike Cursor, Windsurf, or other AI IDEs that wrap a chat interface around an editor, Aria is **architecture-aware from the ground up**:
+
+- **Self-introspection** — Aria can read her own module graph, source code, and runtime state via built-in tools
+- **Multi-model braiding** — queries all available LLMs in parallel via a braille-encoded swarm, braids their responses
+- **Runtime loop engine** — plan → execute → observe → evaluate → repair cycle, not just chat
+- **Persistent world model** — knowledge graph that survives across conversations
+- **Context compaction** — automatic context window management using UEB braille compression
+- **Tauri desktop app** — native window with managed Node.js backend, not just a web page
 
 ## Quick Start
 
@@ -10,223 +21,143 @@ cd ai-native-ide
 ./bootstrap.sh
 ```
 
-That's it! The bootstrap script will:
-1. Check for Node.js
-2. Install dependencies
-3. Set up your OpenRouter API key
-4. Start the Aria server and IDE
-5. Open the IDE in your browser
+The bootstrap script installs dependencies, sets up your OpenRouter API key, and starts everything.
 
-**IDE:** http://localhost:4173/ide  
-**API:** http://localhost:3200  
-**CLI:** `npm run aria`
+| Service | URL |
+|---------|-----|
+| **IDE** | http://localhost:4173 |
+| **API** | http://localhost:3200 |
+| **WebSocket** | ws://localhost:3201 |
+| **CLI** | `npm run aria` |
 
 To stop: `./stop.sh`
 
-## What is included
+## Architecture
 
-- A formal manifesto document.
-- A JavaScript implementation of a runtime-native agent loop.
-- Sensor abstractions for:
-  - code state
-  - execution state
-  - interface state
-- Semantic interaction primitives that sit above raw browser actions.
-- A comprehensive, test-driven suite that validates core loop behavior and semantic interaction contracts.
-- A **Tauri desktop shell scaffold** with a 3-panel IDE-like layout and backend commands.
-- An **Ollama-style installer script** in `scripts/install.sh` that installs an `ai-native-ide` command.
-- Socket monitoring tooling and npm network tuning (`maxsockets=10`).
+Aria has a machine-readable architecture manifest at `ARCHITECTURE.json` that she can read herself. The system is organized in layers:
 
-## Install options
-
-### Option A — one-liner installer (Ollama style)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elevate-foundry/ai-native-ide/HEAD/scripts/install.sh | bash
+```
+┌─────────────────────────────────────────────────────┐
+│  Desktop Shell (Tauri v2)                           │
+│  src-tauri/src/main.rs — spawns & manages Node.js   │
+│  desktop/ide.html + ide.js — Monaco-based IDE UI    │
+├─────────────────────────────────────────────────────┤
+│  Server (Node.js)                                   │
+│  scripts/aria-server.mjs — HTTP + SSE streaming     │
+│  Port 3200 (API) + 3201 (WebSocket)                 │
+├─────────────────────────────────────────────────────┤
+│  Agent                                              │
+│  src/agent.js — multi-turn agentic loop with tools  │
+│  src/tools.js — file ops, commands, browser, etc.   │
+│  src/introspect.js — self-awareness tools           │
+├─────────────────────────────────────────────────────┤
+│  Intelligence                                       │
+│  src/llm.cjs — OpenRouter client with streaming     │
+│  src/compaction.js — context window management      │
+│  src/world-model.js — persistent knowledge graph    │
+├─────────────────────────────────────────────────────┤
+│  Braille Communication                              │
+│  src/braille.js — unified encoding (byte + char)    │
+│  src/braille-swarm.js — multi-model orchestration   │
+│  src/braided-llm.js — response braiding & fusion    │
+│  src/braille-harness.js — UEB compression           │
+│  src/braille-websocket.js — real-time streaming     │
+├─────────────────────────────────────────────────────┤
+│  Core Loop                                          │
+│  src/core.js — plan/execute/observe/evaluate cycle  │
+└─────────────────────────────────────────────────────┘
 ```
 
-After install:
+## Project Structure
 
-```bash
-ai-native-ide dev
+```
+src/
+  agent.js            — Agentic loop with tool use and streaming
+  tools.js            — Tool definitions and implementations
+  introspect.js       — Self-awareness (architecture, module, runtime introspection)
+  llm.cjs             — OpenRouter LLM client
+  braille.js          — Consolidated braille encoding/decoding
+  braille-swarm.js    — Multi-model swarm via OpenRouter
+  braille-websocket.js — Real-time braille WebSocket server
+  braided-llm.js      — Multi-model response braiding
+  braille-harness.js  — UEB Grade-2 contractions
+  compaction.js       — Context window management
+  world-model.js      — Persistent knowledge graph
+  file-history.js     — File operation history with undo/redo
+  core.js             — Runtime loop engine
+  bbid.js             — Behavioral biometrics identity
+  index.js            — Public API exports
+
+desktop/
+  ide.html            — IDE interface
+  ide.js              — Monaco editor, file tree, chat, terminal
+  ide.css             — IDE styling
+
+scripts/
+  aria-server.mjs     — HTTP/WebSocket server (the agent's brain)
+  aria-cli.mjs        — CLI interface
+  serve-desktop.mjs   — Static dev server for the frontend
+  start-aria.sh       — Full startup script
+  install.sh          — One-line installer
+
+src-tauri/
+  src/main.rs         — Tauri commands (server lifecycle, health, introspection)
+  tauri.conf.json     — Tauri v2 configuration
+  Cargo.toml          — Rust dependencies
+
+ARCHITECTURE.json     — Machine-readable architecture manifest (Aria reads this)
 ```
 
-> The URL above should point at your repo's raw `scripts/install.sh`.
+## Install Options
 
-If macOS prints “The default interactive shell is now zsh”, that is informational.
-You can still run the installer with bash using the command above (note the `| bash`).
-
-
-If you get `curl: (22) ... 404`, usually one of these is true:
-
-- the repository is private,
-- the default branch has not been updated yet,
-- or the path/organization is incorrect.
-
-Fallback that always works if you can clone:
+### Option A — bootstrap (recommended)
 
 ```bash
-git clone https://github.com/elevate-foundry/ai-native-ide.git ai-native-ide
+git clone https://github.com/elevate-foundry/ai-native-ide.git
 cd ai-native-ide
-bash scripts/install.sh
+./bootstrap.sh
 ```
 
-### Option B — clone and run
+### Option B — manual
 
 ```bash
-git clone https://github.com/elevate-foundry/ai-native-ide.git ai-native-ide
+git clone https://github.com/elevate-foundry/ai-native-ide.git
 cd ai-native-ide
 npm install
-npm test
-npm run tauri:dev
+npm run aria:server   # Start the backend
+npm run ide           # Start the frontend (separate terminal)
 ```
 
-### About `apt-get` style installs
+### Option C — Tauri desktop app
 
-A command like this works only after publishing a Debian package and apt repository:
+Requires Rust toolchain and Tauri CLI (`cargo install tauri-cli --version '^2.0.0'`).
 
 ```bash
-sudo apt-get update && sudo apt-get install ai-native-ide -y
+npm run tauri:dev     # Development mode
+npm run tauri:build   # Production bundles
 ```
 
-This repo currently ships a script-based installer, not an apt package.
+## Introspection API
 
-## Socket monitoring + npm maxsockets tuning
+Aria exposes her self-awareness via both tools (for the agent) and HTTP endpoints (for the frontend):
 
-Run socket monitor once:
+| Endpoint | Description |
+|----------|-------------|
+| `GET /introspect` | Architecture manifest summary |
+| `GET /introspect/module?name=agent.js` | Module metadata + full source |
+| `GET /introspect/runtime` | Process info, memory, ports, environment |
+| `GET /introspect/dependencies` | Full dependency graph |
 
-```bash
-npm run monitor:sockets:once
-```
+The agent can also use these as tools: `introspect_architecture`, `introspect_module`, `introspect_runtime`, `introspect_dependencies`, `introspect_capabilities`.
 
-Run continuous socket monitor:
-
-```bash
-npm run monitor:sockets
-```
-
-Apply npm network tuning:
-
-```bash
-npm config set maxsockets 10
-# or
-npm run npm:maxsockets
-```
-
-If you installed via `scripts/install.sh`, this tuning is applied automatically during install.
-
-Launcher equivalents:
-
-```bash
-ai-native-ide sockets:once
-ai-native-ide sockets
-ai-native-ide tune
-```
-
-## MCP server
-
-You can run an MCP (Model Context Protocol) server over stdio:
-
-```bash
-npm run mcp
-```
-
-If you installed the launcher:
-
-```bash
-ai-native-ide mcp
-```
-
-The MCP server exposes two tools:
-
-- `run_runtime_loop`
-- `get_interface_sensor_snapshot`
-
-## Quick start
+## Testing
 
 ```bash
 npm test
 ```
 
-For OS-specific startup commands (macOS, Linux, Windows/Surface), see `docs/RUNNING_THE_IDE.md`.
+The test suite covers the core loop engine, desktop scaffold contracts, installer behavior, socket monitoring, MCP server, and documentation completeness.
 
+## Why This Exists
 
-## Tauri app (desktop shell)
-
-### Prerequisites
-
-- Rust toolchain (stable)
-- Tauri CLI (`cargo install tauri-cli --version '^2.0.0'`)
-
-### Run browser preview of the desktop UI
-
-```bash
-npm run tauri:web
-```
-
-Then open `http://127.0.0.1:4173`.
-
-### Run as a real Tauri app
-
-```bash
-npm run tauri:dev
-```
-
-This launches the desktop window and wires frontend calls to Rust commands in `src-tauri/src/main.rs`.
-
-### Build desktop bundles
-
-```bash
-npm run tauri:build
-```
-
-## TDD workflow
-
-1. Add or update tests in `test/` for the behavior you want to guarantee.
-2. Run `npm test` and confirm the new test fails first.
-3. Implement the behavior in `src/`, `desktop/`, or `src-tauri/`.
-4. Re-run `npm test` and ensure all tests pass.
-
-The test suite currently covers:
-
-- constructor contract validation,
-- successful completion paths,
-- repair/replan behavior,
-- max-iteration exhaustion behavior,
-- context/history propagation,
-- Playwright observer adapter sequencing,
-- semantic browser action call order,
-- Tauri scaffold contract checks (scripts/config/commands),
-- installer script and launcher contract checks,
-- socket monitor contract checks,
-- MCP server tool discovery and calls.
-
-## Project structure
-
-- `manifesto/PLAYWRIGHT_NATIVE_AI_IDE_MANIFESTO.md` — manifesto text.
-- `src/core.js` — loop engine and sensor contracts.
-- `src/semanticActions.js` — semantic browser operations.
-- `src/index.js` — public exports.
-- `desktop/` — Tauri frontend shell (3-panel runtime observatory UI).
-- `src-tauri/` — Rust backend commands and Tauri config.
-- `scripts/serve-desktop.mjs` — static dev server for desktop frontend preview.
-- `scripts/install.sh` — one-line install entrypoint.
-- `scripts/monitor-sockets.mjs` — socket count monitor.
-- `scripts/mcp-server.mjs` — stdio MCP server with runtime tools.
-- `test/core.test.js` — loop, sensor, and observer tests.
-- `test/semanticActions.test.js` — semantic interaction tests.
-- `test/desktopScaffold.test.js` — desktop shell scaffold tests.
-- `test/installer.test.js` — installer and launcher behavior tests.
-- `test/socketMonitor.test.js` — socket monitoring checks.
-
-## Why this exists
-
-The goal is to move from **text-first coding assistance** to **runtime-aware system operation** where an AI can:
-
-1. change code,
-2. run the system,
-3. inspect runtime,
-4. inspect UI state through Playwright-like sensors,
-5. repair based on observed failures.
-
-This repo is intentionally minimal, but designed to be extended with a real Playwright adapter and real build/test/runtime process hooks.
+The goal is to build an AI coding agent that is genuinely **native** to its own runtime — not a chat wrapper on an editor, but a system that understands its own construction and can reason about, modify, and repair itself.

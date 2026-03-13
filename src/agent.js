@@ -194,17 +194,11 @@ class AriaAgent {
           })),
         });
 
-        // Notify about tool calls
-        this.onChunk(`\n\n🔧 Using tools...\n`);
-
+        // Execute tool calls — notify via dedicated callbacks (not onChunk)
         for (const toolCall of response.toolCalls) {
-          this.onChunk(`  → ${toolCall.name}(${JSON.stringify(toolCall.arguments).slice(0, 100)}...)\n`);
           this.onToolCall(toolCall);
 
           const result = await this.tools.execute(toolCall.name, toolCall.arguments);
-          
-          const resultPreview = JSON.stringify(result).slice(0, 200);
-          this.onChunk(`  ✓ ${resultPreview}${resultPreview.length >= 200 ? '...' : ''}\n`);
           this.onToolResult(toolCall.name, result);
 
           // Add tool result to history
@@ -216,7 +210,6 @@ class AriaAgent {
           });
         }
 
-        this.onChunk(`\n`);
         continue;
       }
 
@@ -393,6 +386,34 @@ class AriaAgent {
 
   getHistory() {
     return this.conversationHistory;
+  }
+
+  /**
+   * Get performance metrics for the agent
+   * @returns {Object} Performance metrics including:
+   *   - totalIterations: Number of tool-use iterations
+   *   - averageResponseTime: Average time per response
+   *   - toolUsageStats: Count of each tool used
+   */
+  getMetrics() {
+    const metrics = {
+      totalIterations: 0,
+      toolUsageStats: {},
+      averageResponseTime: 0,
+      totalResponses: this.conversationHistory.filter(msg => msg.role === 'assistant').length
+    };
+
+    // Calculate tool usage stats
+    this.conversationHistory.forEach(msg => {
+      if (msg.tool_calls) {
+        metrics.totalIterations++;
+        msg.tool_calls.forEach(tc => {
+          metrics.toolUsageStats[tc.function.name] = (metrics.toolUsageStats[tc.function.name] || 0) + 1;
+        });
+      }
+    });
+
+    return metrics;
   }
 }
 

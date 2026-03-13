@@ -11,39 +11,7 @@
  * multi-model response, creating a novel form of model fusion.
  */
 
-// ============================================================================
-// Braille Encoding/Decoding
-// ============================================================================
-
-const BRAILLE_MAP = {
-  'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑',
-  'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
-  'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕',
-  'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
-  'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽',
-  'z': '⠵',
-  '0': '⠴', '1': '⠂', '2': '⠆', '3': '⠒', '4': '⠲',
-  '5': '⠢', '6': '⠖', '7': '⠶', '8': '⠦', '9': '⠔',
-  ' ': '⠀', '.': '⠲', ',': '⠂', '!': '⠖', '?': '⠦',
-  "'": '⠄', '-': '⠤', ':': '⠒', ';': '⠆', '(': '⠶',
-  ')': '⠶', '/': '⠌', '"': '⠄', '\n': '⠀',
-};
-
-const REVERSE_BRAILLE_MAP = Object.fromEntries(
-  Object.entries(BRAILLE_MAP).map(([k, v]) => [v, k])
-);
-
-function textToBraille(text) {
-  return text.toLowerCase().split('').map(char => {
-    return BRAILLE_MAP[char] || '⠿'; // ⠿ for unknown chars
-  }).join('');
-}
-
-function brailleToText(braille) {
-  return braille.split('').map(char => {
-    return REVERSE_BRAILLE_MAP[char] || '?';
-  }).join('');
-}
+const { BRAILLE_MAP, REVERSE_BRAILLE_MAP, textToBraille, brailleToText } = require('./braille');
 
 // ============================================================================
 // Braiding Strategies

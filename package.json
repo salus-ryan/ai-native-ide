@@ -1,8 +1,8 @@
 {
-  "name": "playwright-native-ai-ide",
+  "name": "aria-ide",
   "version": "0.1.0",
   "private": true,
-  "description": "Runtime-native AI IDE prototype with Playwright-aware abstractions",
+  "description": "Aria — a self-aware, architecture-native AI coding agent in a Tauri desktop shell",
   "main": "src/index.js",
   "scripts": {
     "test": "node --test",
@@ -18,7 +18,7 @@
     "logo": "node scripts/generate-logo.mjs",
     "aria": "node scripts/aria-cli.mjs",
     "aria:server": "node scripts/aria-server.mjs",
-    "ide": "IDE_MODE=true node scripts/serve-desktop.mjs",
+    "ide": "node scripts/serve-desktop.mjs",
     "start": "./scripts/start-aria.sh"
   },
   "devDependencies": {

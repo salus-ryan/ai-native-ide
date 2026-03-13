@@ -24,6 +24,22 @@ const { BrailleWebSocketServer, toBraille, fromBraille } = require('../src/brail
 
 const PROJECT_ROOT = process.cwd();
 const HOME_DIR = os.homedir();
+const DESKTOP_DIR = path.join(PROJECT_ROOT, 'desktop');
+
+// MIME types for serving the IDE frontend
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+};
 
 // Directories to skip when indexing
 const SKIP_DIRS = new Set([
@@ -778,6 +794,94 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ============================================================================
+  // Introspection API
+  // ============================================================================
+
+  // Get architecture manifest
+  if (req.method === 'GET' && req.url === '/introspect') {
+    try {
+      const { introspectArchitecture } = require('../src/introspect.js');
+      const result = introspectArchitecture();
+      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // Introspect specific module
+  if (req.method === 'GET' && req.url.startsWith('/introspect/module')) {
+    const url = new URL(req.url, `http://localhost:${PORT}`);
+    const moduleName = url.searchParams.get('name');
+    
+    try {
+      const { introspectModule } = require('../src/introspect.js');
+      const result = introspectModule(moduleName);
+      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // Introspect runtime
+  if (req.method === 'GET' && req.url === '/introspect/runtime') {
+    try {
+      const { introspectRuntime } = require('../src/introspect.js');
+      const result = introspectRuntime();
+      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // Introspect dependencies
+  if (req.method === 'GET' && req.url === '/introspect/dependencies') {
+    try {
+      const { introspectDependencies } = require('../src/introspect.js');
+      const result = introspectDependencies();
+      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // ============================================================================
+  // Static File Server — IDE Frontend
+  // ============================================================================
+
+  // Serve the IDE frontend from desktop/ directory
+  let reqPath = req.url.split('?')[0]; // strip query params
+  if (reqPath === '/' || reqPath === '/ide') reqPath = '/ide.html';
+
+  const filePath = path.join(DESKTOP_DIR, reqPath);
+  // Security: don't serve files outside desktop/
+  if (filePath.startsWith(DESKTOP_DIR)) {
+    try {
+      const data = fs.readFileSync(filePath);
+      const ext = path.extname(filePath);
+      res.writeHead(200, {
+        'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(data);
+      return;
+    } catch {
+      // Fall through to 404
+    }
+  }
+
   // 404 for everything else
   res.writeHead(404, { ...corsHeaders, 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
@@ -789,34 +893,16 @@ const brailleWS = new BrailleWebSocketServer({ port: BRAILLE_WS_PORT });
 brailleWS.start();
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🤖 Aria server running at http://localhost:${PORT}`);
-  console.log(`⠃⠗ Braille WebSocket at ws://localhost:${BRAILLE_WS_PORT}`);
-  console.log(`\n📁 File System:`);
-  console.log(`   GET  /files          - List files in directory`);
-  console.log(`   GET  /file           - Read file content`);
-  console.log(`   POST /file           - Write file content`);
-  console.log(`   GET  /browse         - Browse any directory (including ~)`);
-  console.log(`   GET  /tree           - Walk entire directory tree`);
-  console.log(`   GET  /recent         - Get recently modified files`);
-  console.log(`   GET  /workspace      - Get workspace summary`);
-  console.log(`\n🔍 Search:`);
-  console.log(`   GET  /search/files   - Search files by name`);
-  console.log(`   GET  /search/content - Search file contents (grep)`);
-  console.log(`\n💬 Chat:`);
-  console.log(`   POST /chat           - Send a message (streaming SSE)`);
-  console.log(`   GET  /stats          - Get context statistics`);
-  console.log(`   POST /clear          - Clear conversation history`);
-  console.log(`\n⚡ Commands:`);
-  console.log(`   POST /exec           - Execute shell command`);
-  console.log(`   GET  /health         - Health check`);
-  console.log(`\n📜 History:`);
-  console.log(`   GET  /history/file   - Get file timeline`);
-  console.log(`   GET  /history/recent - Get recent operations`);
-  console.log(`   GET  /history/status - Get undo/redo status`);
-  console.log(`   POST /history/undo   - Undo last operation`);
-  console.log(`   POST /history/redo   - Redo last undone operation`);
-  console.log(`   POST /history/restore - Restore file to point`);
-  console.log(`\n⠃⠗ Braille WebSocket:`);
-  console.log(`   ws://localhost:${BRAILLE_WS_PORT} - Real-time braille braiding`);
-  console.log(`   Messages: chat, swarm, encode, decode, feedback`);
+  console.log('');
+  console.log('  ╔═══════════════════════════════════════════════╗');
+  console.log('  ║              Aria IDE is running               ║');
+  console.log('  ╚═══════════════════════════════════════════════╝');
+  console.log('');
+  console.log(`  🌐 IDE + API:     http://localhost:${PORT}`);
+  console.log(`  ⠃⠗ Braille WS:   ws://localhost:${BRAILLE_WS_PORT}`);
+  console.log(`  📁 Working dir:   ${PROJECT_ROOT}`);
+  console.log('');
+  console.log('  Open the URL above in your browser to start.');
+  console.log('  Press Ctrl+C to stop.');
+  console.log('');
 });

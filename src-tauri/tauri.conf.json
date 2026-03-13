@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Playwright Native AI IDE",
+  "productName": "Aria IDE",
   "version": "0.1.0",
-  "identifier": "com.example.playwright-native-ai-ide",
+  "identifier": "com.elevatefoundry.aria-ide",
   "build": {
     "beforeDevCommand": "npm run tauri:web",
     "beforeBuildCommand": "npm run tauri:web",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Playwright-Native AI IDE",
+        "title": "Aria IDE",
         "width": 1440,
         "height": 900,
         "resizable": true

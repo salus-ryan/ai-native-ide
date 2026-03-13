@@ -16,34 +16,9 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 const { BrailleSwarm, ModelRegistry } = require('./braille-swarm.js');
+const { BRAILLE_BASE, toBraille, fromBraille } = require('./braille');
 
-const BRAILLE_BASE = 0x2800;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-// ============================================================================
-// Braille Encoding/Decoding
-// ============================================================================
-
-function toBraille(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(text);
-  let result = '';
-  for (const byte of bytes) {
-    result += String.fromCodePoint(BRAILLE_BASE + byte);
-  }
-  return result;
-}
-
-function fromBraille(braille) {
-  const bytes = [];
-  for (const char of braille) {
-    const cp = char.codePointAt(0);
-    if (cp >= BRAILLE_BASE && cp <= BRAILLE_BASE + 255) {
-      bytes.push(cp - BRAILLE_BASE);
-    }
-  }
-  return new TextDecoder().decode(new Uint8Array(bytes));
-}
 
 // ============================================================================
 // Braille Stream Processor

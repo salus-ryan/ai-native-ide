@@ -11,7 +11,7 @@
  * 5. CROSS-MODEL CONSISTENCY: DeepSeek, Claude, GPT all normalize to same form
  */
 
-const BRAILLE_BASE = 0x2800;
+const { BRAILLE_BASE, toBraille, fromBraille } = require('./braille');
 
 // ============================================================================
 // UEB Word Contractions (Grade 2 Braille)
@@ -91,7 +91,7 @@ for (const [word, braille] of Object.entries(UEB_CONTRACTIONS)) {
 }
 
 // ============================================================================
-// 8-Dot Braille Core Encoding
+// 8-Dot Braille Core Encoding (delegated to src/braille.js)
 // ============================================================================
 
 function byteToBraille(byte) {
@@ -106,24 +106,9 @@ function brailleToByte(char) {
   return null;
 }
 
-function textToBrailleRaw(text) {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(text);
-  let result = '';
-  for (const byte of bytes) {
-    result += byteToBraille(byte);
-  }
-  return result;
-}
-
-function brailleToTextRaw(braille) {
-  const bytes = [];
-  for (const char of braille) {
-    const byte = brailleToByte(char);
-    if (byte !== null) bytes.push(byte);
-  }
-  return new TextDecoder().decode(new Uint8Array(bytes));
-}
+// Aliases for backward compatibility — delegate to consolidated module
+const textToBrailleRaw = toBraille;
+const brailleToTextRaw = fromBraille;
 
 // ============================================================================
 // UEB Braiding Harness

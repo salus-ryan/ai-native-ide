@@ -430,27 +430,30 @@ class BehavioralTracker {
 }
 
 // ============================================================================
-// Braille Encoding (BBES-style)
+// Braille Encoding (delegated to src/braille.js)
 // ============================================================================
 
-const BRAILLE_MAP = {
-  '0': '⠚', '1': '⠁', '2': '⠃', '3': '⠉', '4': '⠙',
-  '5': '⠑', '6': '⠋', '7': '⠛', '8': '⠓', '9': '⠊',
-  'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑',
-  'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
-  'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕',
-  'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
-  'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽',
-  'z': '⠵', ' ': '⠀', '-': '⠤', '.': '⠲', ',': '⠂',
-};
-
-function toBraille(text) {
-  return text.toLowerCase().split('').map(c => BRAILLE_MAP[c] || c).join('');
+// bbid.js runs in browser context too, so we conditionally import
+let _textToBraille;
+try {
+  _textToBraille = require('./braille').textToBraille;
+} catch {
+  // Browser context fallback — inline minimal implementation
+  const BRAILLE_MAP = {
+    '0': '⠚', '1': '⠁', '2': '⠃', '3': '⠉', '4': '⠙',
+    '5': '⠑', '6': '⠋', '7': '⠛', '8': '⠓', '9': '⠊',
+    'a': '⠁', 'b': '⠃', 'c': '⠉', 'd': '⠙', 'e': '⠑',
+    'f': '⠋', 'g': '⠛', 'h': '⠓', 'i': '⠊', 'j': '⠚',
+    'k': '⠅', 'l': '⠇', 'm': '⠍', 'n': '⠝', 'o': '⠕',
+    'p': '⠏', 'q': '⠟', 'r': '⠗', 's': '⠎', 't': '⠞',
+    'u': '⠥', 'v': '⠧', 'w': '⠺', 'x': '⠭', 'y': '⠽',
+    'z': '⠵', ' ': '⠀', '-': '⠤', '.': '⠲', ',': '⠂',
+  };
+  _textToBraille = (text) => text.toLowerCase().split('').map(c => BRAILLE_MAP[c] || c).join('');
 }
 
 function encodeFingerprintAsBraille(hash) {
-  // Take first 16 chars of hash and convert to braille
-  return toBraille(hash.substring(0, 16));
+  return _textToBraille(hash.substring(0, 16));
 }
 
 // ============================================================================

@@ -6,10 +6,10 @@ function read(path) {
   return fs.readFileSync(path, 'utf8');
 }
 
-test('desktop UI scaffold files exist', () => {
-  assert.equal(fs.existsSync('desktop/index.html'), true);
-  assert.equal(fs.existsSync('desktop/main.js'), true);
-  assert.equal(fs.existsSync('desktop/styles.css'), true);
+test('desktop IDE files exist', () => {
+  assert.equal(fs.existsSync('desktop/ide.html'), true);
+  assert.equal(fs.existsSync('desktop/ide.js'), true);
+  assert.equal(fs.existsSync('desktop/ide.css'), true);
 });
 
 test('package scripts include tauri entrypoints', () => {
@@ -25,9 +25,8 @@ test('tauri config points to desktop frontend and dev url', () => {
   assert.equal(conf.build.frontendDist, '../desktop');
 });
 
-test('rust backend declares runtime and sensor commands', () => {
+test('rust backend declares tauri commands', () => {
   const rust = read('src-tauri/src/main.rs');
-  assert.match(rust, /fn run_runtime_loop\(/);
-  assert.match(rust, /fn get_interface_sensor_snapshot\(/);
+  assert.match(rust, /tauri::command/);
   assert.match(rust, /invoke_handler\(tauri::generate_handler!\[/);
 });

@@ -1,0 +1,231 @@
+{
+  "name": "aria-ide",
+  "version": "0.1.0",
+  "identity": {
+    "name": "Aria",
+    "fullName": "AI Runtime Interactive Agent",
+    "description": "A self-aware, architecture-native AI coding agent that can introspect her own module graph, runtime state, and capabilities."
+  },
+  "layers": {
+    "desktop": {
+      "description": "Tauri v2 desktop shell — Rust backend + web frontend",
+      "entrypoint": "src-tauri/src/main.rs",
+      "frontend": "desktop/ide.html",
+      "responsibilities": [
+        "Window management and native OS integration",
+        "Spawn and manage the Node.js aria-server process",
+        "Health checking via IPC commands",
+        "Serve the IDE frontend from desktop/"
+      ]
+    },
+    "server": {
+      "description": "Node.js HTTP + WebSocket server — the agent's brain",
+      "entrypoint": "scripts/aria-server.mjs",
+      "port": 3200,
+      "responsibilities": [
+        "Chat endpoint with SSE streaming",
+        "File system operations (read/write/browse/search)",
+        "Command execution",
+        "History tracking (undo/redo)",
+        "Workspace indexing"
+      ]
+    },
+    "agent": {
+      "description": "Multi-turn agentic loop with tool use",
+      "entrypoint": "src/agent.js",
+      "responsibilities": [
+        "Conversation management with context compaction",
+        "Tool dispatch (file ops, commands, browser, world model, braided queries)",
+        "Streaming LLM integration via OpenRouter",
+        "Multi-model braided responses via braille swarm"
+      ]
+    },
+    "tools": {
+      "description": "Tool implementations that give Aria agency",
+      "entrypoint": "src/tools.js",
+      "categories": {
+        "filesystem": ["read_file", "write_file", "edit_file", "list_directory", "search_files"],
+        "execution": ["run_command"],
+        "browser": ["browser_navigate", "browser_click", "browser_type", "browser_snapshot", "browser_screenshot"],
+        "world_model": ["world_query", "world_observe", "world_add_entity", "world_add_relation"],
+        "braided_llm": ["braided_query", "text_to_braille", "braille_to_text"],
+        "introspection": ["introspect_architecture", "introspect_module", "introspect_runtime"]
+      }
+    },
+    "braille": {
+      "description": "Braille-native communication and multi-model orchestration",
+      "modules": {
+        "braille.js": "Unified encoding/decoding (byte-level + character-level)",
+        "braille-swarm.js": "Massive multi-model swarm via OpenRouter (all available models)",
+        "braille-websocket.js": "Real-time WebSocket braille streaming between UI, agent, and LLMs",
+        "braille-harness.js": "UEB Grade-2 contractions for semantic compression",
+        "braided-llm.js": "Multi-model response braiding with braille fingerprinting"
+      }
+    },
+    "intelligence": {
+      "description": "LLM integration, context management, and knowledge persistence",
+      "modules": {
+        "llm.cjs": "OpenRouter client with streaming support",
+        "compaction.js": "Context window management — summarization, sliding window, tool result compression",
+        "world-model.js": "Persistent knowledge graph (entities, relations, facts, observations)",
+        "file-history.js": "Full file operation history with undo/redo"
+      }
+    },
+    "core": {
+      "description": "Runtime loop engine — plan/execute/observe/evaluate cycle",
+      "entrypoint": "src/core.js",
+      "responsibilities": [
+        "SensorSnapshot: unified view of code, execution, and interface state",
+        "RuntimeNativeIDE: iterative goal-seeking loop with repair",
+        "PlaywrightInterfaceObserver: browser automation adapter"
+      ]
+    }
+  },
+  "modules": {
+    "src/agent.js": {
+      "type": "core",
+      "format": "cjs",
+      "exports": ["AriaAgent", "ARIA_AGENT_PROMPT"],
+      "imports": ["src/tools.js", "src/llm.cjs", "src/compaction.js"],
+      "description": "The agentic loop — multi-turn chat with tool use and streaming"
+    },
+    "src/tools.js": {
+      "type": "core",
+      "format": "cjs",
+      "exports": ["TOOL_DEFINITIONS", "AriaTools"],
+      "imports": ["src/world-model.js", "src/braided-llm.js"],
+      "description": "Tool definitions (OpenAI format) and implementations"
+    },
+    "src/llm.cjs": {
+      "type": "core",
+      "format": "cjs",
+      "exports": ["createLLMClient", "ariaAnalyze", "ariaGeneratePlan", "ARIA_SYSTEM_PROMPT", "DEFAULT_CONFIG"],
+      "imports": [],
+      "description": "OpenRouter LLM client with streaming, system prompt, and analysis functions"
+    },
+    "src/braille.js": {
+      "type": "foundation",
+      "format": "cjs",
+      "exports": ["BRAILLE_BASE", "BRAILLE_MAP", "REVERSE_BRAILLE_MAP", "toBraille", "fromBraille", "textToBraille", "brailleToText"],
+      "imports": [],
+      "description": "Consolidated braille encoding — byte-level (lossless) and character-level (human-readable)"
+    },
+    "src/braille-swarm.js": {
+      "type": "braille",
+      "format": "cjs",
+      "exports": ["BrailleSwarm", "ModelRegistry"],
+      "imports": ["src/braille.js"],
+      "description": "Probes OpenRouter for all models, creates categorized swarm for parallel communication"
+    },
+    "src/braille-websocket.js": {
+      "type": "braille",
+      "format": "cjs",
+      "exports": ["BrailleWebSocketServer", "toBraille", "fromBraille"],
+      "imports": ["src/braille.js", "src/braille-swarm.js"],
+      "description": "Real-time WebSocket server for braille streaming between UI, agent, and LLMs"
+    },
+    "src/braille-harness.js": {
+      "type": "braille",
+      "format": "cjs",
+      "exports": ["BrailleHarness", "braidConversation", "findDuplicates"],
+      "imports": ["src/braille.js"],
+      "description": "UEB Grade-2 contractions for semantic compression and deduplication"
+    },
+    "src/braided-llm.js": {
+      "type": "braille",
+      "format": "cjs",
+      "exports": ["BraidedLLMTools", "BRAIDED_LLM_TOOLS"],
+      "imports": ["src/braille.js"],
+      "description": "Multi-model response braiding with multiple strategies (word, sentence, semantic)"
+    },
+    "src/compaction.js": {
+      "type": "intelligence",
+      "format": "cjs",
+      "exports": ["ContextManager", "estimateHistoryTokens"],
+      "imports": ["src/llm.cjs", "src/braille-harness.js"],
+      "description": "Context window management with summarization, truncation, and braille compression"
+    },
+    "src/world-model.js": {
+      "type": "intelligence",
+      "format": "cjs",
+      "exports": ["WorldModelTools", "WORLD_MODEL_TOOLS"],
+      "imports": [],
+      "description": "Persistent knowledge graph — entities, relations, facts, temporal observations"
+    },
+    "src/file-history.js": {
+      "type": "intelligence",
+      "format": "cjs",
+      "exports": ["fileHistory"],
+      "imports": [],
+      "description": "Full file operation history with content snapshots, undo/redo, and timeline"
+    },
+    "src/core.js": {
+      "type": "core",
+      "format": "cjs",
+      "exports": ["SensorSnapshot", "RuntimeNativeIDE", "PlaywrightInterfaceObserver"],
+      "imports": [],
+      "description": "The plan→execute→observe→evaluate loop engine with sensor snapshot model"
+    },
+    "src/bbid.js": {
+      "type": "identity",
+      "format": "cjs",
+      "exports": ["AriaBBID"],
+      "imports": ["src/braille.js"],
+      "description": "Behavioral biometrics identity detection — device fingerprinting and braille encoding"
+    },
+    "src/index.js": {
+      "type": "entrypoint",
+      "format": "cjs",
+      "exports": ["*"],
+      "imports": ["src/core.js", "src/llm.cjs", "src/agent.js", "src/tools.js"],
+      "description": "Public API — re-exports all core modules"
+    },
+    "scripts/aria-server.mjs": {
+      "type": "server",
+      "format": "esm",
+      "imports": ["src/agent.js", "src/file-history.js", "src/braille-websocket.js"],
+      "description": "HTTP + WebSocket server — the agent's network interface"
+    },
+    "scripts/aria-cli.mjs": {
+      "type": "cli",
+      "format": "esm",
+      "description": "CLI interface for chatting with Aria from the terminal"
+    }
+  },
+  "dependency_graph": {
+    "desktop/ide.html → desktop/ide.js → scripts/aria-server.mjs (HTTP)": "Frontend talks to server via fetch/SSE",
+    "scripts/aria-server.mjs → src/agent.js": "Server instantiates the agent",
+    "src/agent.js → src/tools.js": "Agent dispatches tool calls",
+    "src/agent.js → src/llm.cjs": "Agent calls OpenRouter for LLM responses",
+    "src/agent.js → src/compaction.js": "Agent manages context window",
+    "src/tools.js → src/world-model.js": "Tools include knowledge graph operations",
+    "src/tools.js → src/braided-llm.js": "Tools include multi-model braiding",
+    "src/braided-llm.js → src/braille.js": "Braiding uses braille encoding",
+    "src/braille-swarm.js → src/braille.js": "Swarm uses braille encoding",
+    "src/braille-websocket.js → src/braille-swarm.js": "WebSocket orchestrates the swarm",
+    "src/compaction.js → src/braille-harness.js": "Compaction uses UEB for compression",
+    "src-tauri/src/main.rs → scripts/aria-server.mjs (spawn)": "Tauri spawns Node server as child process"
+  },
+  "runtime": {
+    "processes": {
+      "tauri": "Native desktop window (Rust) — spawns node server",
+      "node_server": "aria-server.mjs on port 3200 — agent brain",
+      "websocket": "braille-websocket on port 3201 — real-time braille streaming"
+    },
+    "communication": {
+      "frontend_to_server": "HTTP fetch + Server-Sent Events (SSE) for streaming",
+      "server_to_llm": "HTTPS to OpenRouter API (streaming)",
+      "braille_streaming": "WebSocket on port 3201",
+      "tauri_ipc": "Tauri invoke_handler for native commands"
+    }
+  },
+  "what_makes_this_different": [
+    "Aria can read this file — she knows her own architecture",
+    "The introspect tool lets Aria examine any of her own modules at runtime",
+    "Braille encoding is not a gimmick — it's a compression and normalization layer for multi-model fusion",
+    "The agent loop (core.js) is a real plan→execute→observe→evaluate cycle, not just chat",
+    "Context compaction uses UEB braille contractions for semantic compression",
+    "The world model persists knowledge across conversations",
+    "Multi-model braiding queries all available OpenRouter models in parallel via the swarm"
+  ]
+}
