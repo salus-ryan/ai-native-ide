@@ -103,20 +103,23 @@ else
     echo -e "  ${GREEN}✓${NC} .env file exists"
 fi
 
-# Determine port
+# Determine port and temp directory
 ARIA_PORT=${ARIA_PORT:-3200}
+LOG_DIR=${TMPDIR:-/tmp}
 
 # Start server
 echo -e "${YELLOW}[5/5]${NC} Starting Aria IDE..."
 echo ""
 
-# Kill any existing processes on our ports
-fuser -k $ARIA_PORT/tcp 2>/dev/null || lsof -ti:$ARIA_PORT | xargs kill -9 2>/dev/null || true
+# Kill any existing processes on our port (works on Linux, macOS, and Termux)
+fuser -k $ARIA_PORT/tcp 2>/dev/null || 
+  lsof -ti :$ARIA_PORT 2>/dev/null | xargs kill -9 2>/dev/null || 
+  true
 sleep 1
 
 # Start Aria server (serves both API + IDE on one port)
 echo -e "  Starting Aria on port ${CYAN}$ARIA_PORT${NC}..."
-node scripts/aria-server.mjs > /tmp/aria-server.log 2>&1 &
+node scripts/aria-server.mjs > "$LOG_DIR/aria-server.log" 2>&1 &
 ARIA_PID=$!
 
 # Wait for server to start
@@ -127,12 +130,12 @@ if kill -0 $ARIA_PID 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Aria server running (PID: $ARIA_PID)"
 else
     echo -e "  ${RED}✗${NC} Failed to start Aria server"
-    echo -e "  Check logs: ${CYAN}cat /tmp/aria-server.log${NC}"
+    echo -e "  Check logs: ${CYAN}cat $LOG_DIR/aria-server.log${NC}"
     exit 1
 fi
 
 # Save PID for later cleanup
-echo "$ARIA_PID" > /tmp/aria-server.pid
+echo "$ARIA_PID" > "$LOG_DIR/aria-server.pid"
 
 # Detect LAN IP for mobile access (skip Docker/virtual bridge IPs)
 LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' || \
