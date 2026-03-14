@@ -21,12 +21,12 @@
     "ide": "node scripts/serve-desktop.mjs",
     "start": "./scripts/start-aria.sh"
   },
-  "devDependencies": {
-    "canvas": "^3.2.1"
+  "optionalDependencies": {
+    "canvas": "^3.2.1",
+    "playwright": "^1.58.2"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
-    "playwright": "^1.58.2",
     "ws": "^8.19.0"
   }
 }

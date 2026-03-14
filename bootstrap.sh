@@ -67,7 +67,10 @@ fi
 
 # Install dependencies
 echo -e "${YELLOW}[3/5]${NC} Installing dependencies..."
-npm install --silent 2>/dev/null || npm install
+npm install --silent 2>/dev/null || npm install 2>/dev/null || {
+  echo -e "  ${YELLOW}!${NC} Full install failed, retrying without optional native addons..."
+  npm install --omit=optional
+}
 echo -e "  ${GREEN}✓${NC} Dependencies installed"
 
 # Set up environment
