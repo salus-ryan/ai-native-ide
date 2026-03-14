@@ -131,8 +131,10 @@ fi
 # Save PID for later cleanup
 echo "$ARIA_PID" > /tmp/aria-server.pid
 
-# Detect LAN IP for mobile access
-LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "localhost")
+# Detect LAN IP for mobile access (skip Docker/virtual bridge IPs)
+LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' || \
+         hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^172\.' | grep -v '^127\.' | head -1 || \
+         ipconfig getifaddr en0 2>/dev/null || echo "localhost")
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -146,21 +148,13 @@ echo ""
 echo -e "  ${YELLOW}To stop:${NC}  kill $ARIA_PID"
 echo ""
 
-# Open browser (optional, skip if non-interactive)
-if [ -t 0 ]; then
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        read -p "  Open IDE in browser? [Y/n] " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-            open "http://localhost:$ARIA_PORT"
-        fi
-    elif command -v xdg-open &> /dev/null; then
-        read -p "  Open IDE in browser? [Y/n] " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-            xdg-open "http://localhost:$ARIA_PORT"
-        fi
-    fi
+# Auto-open browser
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    open "http://localhost:$ARIA_PORT" 2>/dev/null &
+elif command -v xdg-open &> /dev/null; then
+    xdg-open "http://localhost:$ARIA_PORT" 2>/dev/null &
+elif command -v termux-open-url &> /dev/null; then
+    termux-open-url "http://localhost:$ARIA_PORT" 2>/dev/null &
 fi
 
 echo -e "${GREEN}Happy coding with Aria! 🚀${NC}"
