@@ -7,8 +7,8 @@
   "scripts": {
     "test": "node --test",
     "tauri:web": "node scripts/serve-desktop.mjs",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "cargo tauri dev",
+    "tauri:build": "cargo tauri build",
     "install:local": "bash scripts/install.sh --repo-url \"$(pwd)\" --branch \"$(git rev-parse --abbrev-ref HEAD)\" --prefix \"$HOME/.local\"",
     "monitor:sockets": "node scripts/monitor-sockets.mjs",
     "monitor:sockets:once": "node scripts/monitor-sockets.mjs --once",

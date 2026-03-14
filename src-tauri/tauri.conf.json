@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.elevatefoundry.aria-ide",
   "build": {
-    "beforeDevCommand": "npm run tauri:web",
-    "beforeBuildCommand": "npm run tauri:web",
-    "devUrl": "http://127.0.0.1:4173",
+    "beforeDevCommand": "npm run aria:server",
+    "beforeBuildCommand": "",
+    "devUrl": "http://127.0.0.1:3200",
     "frontendDist": "../desktop"
   },
   "app": {

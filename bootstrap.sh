@@ -100,20 +100,19 @@ else
     echo -e "  ${GREEN}✓${NC} .env file exists"
 fi
 
-# Determine ports
+# Determine port
 ARIA_PORT=${ARIA_PORT:-3200}
-IDE_PORT=${IDE_PORT:-4173}
 
-# Start servers
+# Start server
 echo -e "${YELLOW}[5/5]${NC} Starting Aria IDE..."
 echo ""
 
 # Kill any existing processes on our ports
-lsof -ti:$ARIA_PORT | xargs kill -9 2>/dev/null || true
-lsof -ti:$IDE_PORT | xargs kill -9 2>/dev/null || true
+fuser -k $ARIA_PORT/tcp 2>/dev/null || lsof -ti:$ARIA_PORT | xargs kill -9 2>/dev/null || true
+sleep 1
 
-# Start Aria server in background
-echo -e "  Starting Aria server on port ${CYAN}$ARIA_PORT${NC}..."
+# Start Aria server (serves both API + IDE on one port)
+echo -e "  Starting Aria on port ${CYAN}$ARIA_PORT${NC}..."
 node scripts/aria-server.mjs > /tmp/aria-server.log 2>&1 &
 ARIA_PID=$!
 
@@ -129,48 +128,38 @@ else
     exit 1
 fi
 
-# Start IDE server in background
-echo -e "  Starting IDE server on port ${CYAN}$IDE_PORT${NC}..."
-IDE_MODE=true node scripts/serve-desktop.mjs > /tmp/aria-ide.log 2>&1 &
-IDE_PID=$!
-
-sleep 1
-
-if kill -0 $IDE_PID 2>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} IDE server running (PID: $IDE_PID)"
-else
-    echo -e "  ${RED}✗${NC} Failed to start IDE server"
-    exit 1
-fi
-
-# Save PIDs for later cleanup
+# Save PID for later cleanup
 echo "$ARIA_PID" > /tmp/aria-server.pid
-echo "$IDE_PID" > /tmp/aria-ide.pid
+
+# Detect LAN IP for mobile access
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ipconfig getifaddr en0 2>/dev/null || echo "localhost")
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  ✓ Aria IDE is ready!${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${CYAN}IDE:${NC}     http://localhost:$IDE_PORT/ide"
-echo -e "  ${CYAN}API:${NC}     http://localhost:$ARIA_PORT"
+echo -e "  ${CYAN}Local:${NC}   http://localhost:$ARIA_PORT"
+echo -e "  ${CYAN}Mobile:${NC}  http://$LAN_IP:$ARIA_PORT"
 echo -e "  ${CYAN}CLI:${NC}     npm run aria"
 echo ""
-echo -e "  ${YELLOW}To stop:${NC}  ./stop.sh  or  kill $ARIA_PID $IDE_PID"
+echo -e "  ${YELLOW}To stop:${NC}  kill $ARIA_PID"
 echo ""
 
-# Open browser (optional)
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    read -p "  Open IDE in browser? [Y/n] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-        open "http://localhost:$IDE_PORT/ide"
-    fi
-elif command -v xdg-open &> /dev/null; then
-    read -p "  Open IDE in browser? [Y/n] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-        xdg-open "http://localhost:$IDE_PORT/ide"
+# Open browser (optional, skip if non-interactive)
+if [ -t 0 ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        read -p "  Open IDE in browser? [Y/n] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+            open "http://localhost:$ARIA_PORT"
+        fi
+    elif command -v xdg-open &> /dev/null; then
+        read -p "  Open IDE in browser? [Y/n] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+            xdg-open "http://localhost:$ARIA_PORT"
+        fi
     fi
 fi
 

@@ -98,9 +98,6 @@ class MetricsCollector {
 // Global metrics collector instance
 const metrics = new MetricsCollector();
 
-// Global model registry instance
-const registry = new ModelRegistry();
-
 // ============================================================================
 // Model Registry - Fetched from OpenRouter
 // ============================================================================
@@ -233,6 +230,9 @@ class ModelRegistry {
     };
   }
 }
+
+// Global model registry instance (must be after class definition)
+const registry = new ModelRegistry();
 
 // ============================================================================
 // Swarm Agent

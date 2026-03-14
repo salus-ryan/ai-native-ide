@@ -1,9 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::process::{Child, Command};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
 // ============================================================================
 // Aria Server Process Manager
@@ -104,11 +104,6 @@ async fn check_health() -> Result<HealthResponse, String> {
     })
 }
 
-#[derive(Deserialize)]
-struct ChatRequest {
-    message: String,
-}
-
 #[derive(Serialize)]
 struct AriaInfo {
     version: String,
@@ -151,6 +146,19 @@ fn get_aria_info() -> Result<AriaInfo, String> {
 fn main() {
     tauri::Builder::default()
         .manage(AriaServer::new())
+        .setup(|app| {
+            // Auto-start the Aria server on launch
+            let server = app.state::<AriaServer>();
+            let project_root = std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            match server.start(&project_root) {
+                Ok(port) => println!("Aria server started on port {}", port),
+                Err(e) => eprintln!("Warning: failed to auto-start Aria server: {}", e),
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             start_aria_server,
             stop_aria_server,

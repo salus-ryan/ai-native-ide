@@ -20,6 +20,7 @@ const execAsync = promisify(exec);
 const require = createRequire(import.meta.url);
 const { AriaAgent } = require('../src/agent.js');
 const { fileHistory } = require('../src/file-history.js');
+const fileTracker = require('../src/file-tracker.js');
 const { BrailleWebSocketServer, toBraille, fromBraille } = require('../src/braille-websocket.js');
 
 const PROJECT_ROOT = process.cwd();
@@ -854,6 +855,41 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // ============================================================================
+  // File Change Tracking
+  // ============================================================================
+
+  // Get file changes
+  if (req.method === 'GET' && req.url === '/files/changes') {
+    try {
+      const changes = await fileTracker.getGitStatus();
+      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(Object.fromEntries(changes)));
+    } catch (e) {
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // Start watching a directory
+  if (req.method === 'POST' && req.url === '/files/watch') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const { path: watchPath } = JSON.parse(body);
+        fileTracker.watchDirectory(watchPath);
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, path: watchPath }));
+      } catch (e) {
+        res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 

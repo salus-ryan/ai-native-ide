@@ -508,16 +508,20 @@ async function sendChatMessage() {
                 updateChatMessage(messageEl, assistantMessage);
               }
             } else if (data.type === 'tool_call') {
-              appendChatMessage('tool', `🔧 ${data.name}: ${JSON.stringify(data.arguments || data.args || {}).slice(0, 100)}`);
-              // Auto-refresh file tree and editor on file operations
+              const toolArgs = data.arguments || data.args || {};
+              const toolPath = toolArgs.path || toolArgs.file_path || '';
+              appendChatMessage('tool', formatToolCallMessage(data.name, toolArgs));
+              // Visual feedback for file operations
               if (['write_file', 'edit_file', 'delete_file'].includes(data.name)) {
+                const titles = { write_file: 'Aria created a file', edit_file: 'Aria edited a file', delete_file: 'Aria deleted a file' };
+                showToast(data.name, titles[data.name], toolPath);
                 setTimeout(() => {
-                  loadFileTree();
+                  loadFileTree().then(() => highlightFileInTree(toolPath, data.name));
                   // Reload current file if Aria edited it
-                  const toolArgs = data.arguments || data.args || {};
-                  if (toolArgs.path && openFiles.has(toolArgs.path)) {
-                    openFiles.delete(toolArgs.path);
-                    openFile(toolArgs.path);
+                  if (toolPath && openFiles.has(toolPath)) {
+                    openFiles.delete(toolPath);
+                    openFile(toolPath);
+                    markTabAriaEdited(toolPath);
                   }
                 }, 500);
               }
@@ -1221,6 +1225,97 @@ document.addEventListener('mouseup', () => {
     document.body.style.userSelect = '';
   }
 });
+
+// ============================================================================
+// Toast Notifications for Aria File Operations
+// ============================================================================
+
+function showToast(type, title, filePath) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const icons = { write_file: '✨', edit_file: '✏️', delete_file: '🗑️' };
+  const classes = { write_file: 'toast-write', edit_file: 'toast-edit', delete_file: 'toast-delete' };
+  const filename = filePath ? filePath.split('/').pop() : '';
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${classes[type] || 'toast-edit'}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || '📄'}</span>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      ${filePath ? `<div class="toast-path" title="${filePath}">${filename}</div>` : ''}
+    </div>
+  `;
+
+  // Click to open the file
+  if (filePath && type !== 'delete_file') {
+    toast.style.cursor = 'pointer';
+    toast.addEventListener('click', () => openFile(filePath));
+  }
+
+  container.appendChild(toast);
+
+  // Auto-dismiss after 4s
+  setTimeout(() => {
+    toast.classList.add('toast-out');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function highlightFileInTree(filePath, type) {
+  const className = type === 'write_file' ? 'aria-created' : 'aria-modified';
+  const items = document.querySelectorAll('.tree-item');
+  items.forEach(item => {
+    if (item.dataset.path === filePath) {
+      item.classList.remove('aria-modified', 'aria-created');
+      // Force reflow for re-triggering animation
+      void item.offsetWidth;
+      item.classList.add(className);
+      // Scroll into view
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Remove class after animation completes
+      setTimeout(() => item.classList.remove(className), 2500);
+    }
+  });
+}
+
+function markTabAriaEdited(filePath) {
+  const tab = document.querySelector(`.tab[data-path="${filePath}"]`);
+  if (tab && !tab.querySelector('.aria-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'aria-badge';
+    badge.title = 'Aria edited this file';
+    tab.insertBefore(badge, tab.querySelector('.close-tab'));
+    // Remove badge after 10s or when user clicks the tab
+    const removeBadge = () => badge.remove();
+    setTimeout(removeBadge, 10000);
+    tab.addEventListener('click', removeBadge, { once: true });
+  }
+}
+
+function formatToolCallMessage(name, args) {
+  const filePath = args.path || args.file_path || '';
+  const filename = filePath ? filePath.split('/').pop() : '';
+  switch (name) {
+    case 'write_file':
+      return `✨ Created file: ${filename}`;
+    case 'edit_file':
+      return `✏️ Edited file: ${filename}`;
+    case 'delete_file':
+      return `🗑️ Deleted file: ${filename}`;
+    case 'execute_command':
+      return `⚡ Running: ${(args.command || '').slice(0, 80)}`;
+    case 'read_file':
+      return `📖 Reading: ${filename}`;
+    case 'list_directory':
+      return `📂 Listing: ${(args.path || '').split('/').pop() || '.'}`;
+    case 'search_files':
+      return `🔍 Searching: ${args.query || args.pattern || ''}`;
+    default:
+      return `🔧 ${name}`;
+  }
+}
 
 // ============================================================================
 // Status & Connection

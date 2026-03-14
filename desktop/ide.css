@@ -1140,6 +1140,121 @@ body {
   background: #da3633;
 }
 
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  animation: toast-in 0.3s ease-out;
+  max-width: 380px;
+}
+
+.toast.toast-out {
+  animation: toast-out 0.3s ease-in forwards;
+}
+
+.toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.toast-path {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast.toast-write {
+  border-left: 3px solid var(--success);
+}
+
+.toast.toast-edit {
+  border-left: 3px solid var(--accent);
+}
+
+.toast.toast-delete {
+  border-left: 3px solid var(--error);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(40px); }
+}
+
+/* File tree: Aria-modified pulse */
+.tree-item.aria-modified {
+  animation: aria-pulse 2s ease-out;
+}
+
+.tree-item.aria-modified .name {
+  color: var(--accent);
+}
+
+.tree-item.aria-created {
+  animation: aria-pulse-green 2s ease-out;
+}
+
+.tree-item.aria-created .name {
+  color: var(--success);
+}
+
+@keyframes aria-pulse {
+  0% { background: rgba(88, 166, 255, 0.25); }
+  100% { background: transparent; }
+}
+
+@keyframes aria-pulse-green {
+  0% { background: rgba(63, 185, 80, 0.25); }
+  100% { background: transparent; }
+}
+
+/* Tab: Aria-edited badge */
+.tab .aria-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(88, 166, 255, 0.6);
+  flex-shrink: 0;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

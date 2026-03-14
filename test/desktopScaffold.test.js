@@ -21,7 +21,7 @@ test('package scripts include tauri entrypoints', () => {
 
 test('tauri config points to desktop frontend and dev url', () => {
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
-  assert.equal(conf.build.devUrl, 'http://127.0.0.1:4173');
+  assert.equal(conf.build.devUrl, 'http://127.0.0.1:3200');
   assert.equal(conf.build.frontendDist, '../desktop');
 });
 

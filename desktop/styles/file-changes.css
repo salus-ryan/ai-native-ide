@@ -1,0 +1,37 @@
+.file-changes-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.file-status-modified {
+    background-color: #4c9fff;
+}
+
+.file-status-added {
+    background-color: #2ecc71;
+}
+
+.file-status-untracked {
+    background-color: #95a5a6;
+}
+
+.file-status-deleted {
+    background-color: #e74c3c;
+}
+
+.file-item.changed {
+    font-weight: 500;
+}
+
+.file-item.changed::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    background-color: #4c9fff;
+}
