@@ -2,7 +2,30 @@
 
 **Aria** is an AI-native IDE where the agent is aware of her own architecture, can introspect her own source code, and operates as a runtime-native system — not just a chatbot bolted onto an editor.
 
-## What makes this different
+## Quick Start
+
+One command. Needs [Node.js](https://nodejs.org/) (v18+) and an [OpenRouter API key](https://openrouter.ai/keys).
+
+```bash
+git clone https://github.com/salus-ryan/ai-native-ide.git
+cd ai-native-ide
+OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE ./bootstrap.sh
+```
+
+This clones the repo, installs dependencies, writes your API key, starts the server, and **auto-opens the IDE in your browser**.
+
+| | URL |
+|---|---|
+| **IDE + API** | http://localhost:3200 |
+| **Braille WebSocket** | ws://localhost:3201 |
+| **Mobile** | `http://<your-lan-ip>:3200` |
+| **CLI** | `npm run aria` |
+
+The server binds to `0.0.0.0` — open it on your phone from the same WiFi.
+
+To stop: `kill $(cat /tmp/aria-server.pid)`
+
+## What Makes This Different
 
 Unlike Cursor, Windsurf, or other AI IDEs that wrap a chat interface around an editor, Aria is **architecture-aware from the ground up**:
 
@@ -11,30 +34,12 @@ Unlike Cursor, Windsurf, or other AI IDEs that wrap a chat interface around an e
 - **Runtime loop engine** — plan → execute → observe → evaluate → repair cycle, not just chat
 - **Persistent world model** — knowledge graph that survives across conversations
 - **Context compaction** — automatic context window management using UEB braille compression
+- **File operation feedback** — toast notifications, file tree highlights, and tab badges when Aria creates or edits files
 - **Tauri desktop app** — native window with managed Node.js backend, not just a web page
-
-## Quick Start
-
-```bash
-git clone https://github.com/elevate-foundry/ai-native-ide.git
-cd ai-native-ide
-./bootstrap.sh
-```
-
-The bootstrap script installs dependencies, sets up your OpenRouter API key, and starts everything.
-
-| Service | URL |
-|---------|-----|
-| **IDE** | http://localhost:4173 |
-| **API** | http://localhost:3200 |
-| **WebSocket** | ws://localhost:3201 |
-| **CLI** | `npm run aria` |
-
-To stop: `./stop.sh`
 
 ## Architecture
 
-Aria has a machine-readable architecture manifest at `ARCHITECTURE.json` that she can read herself. The system is organized in layers:
+Aria has a machine-readable architecture manifest at `ARCHITECTURE.json` that she can read herself. A single Node.js server (`aria-server.mjs`) serves both the API and the IDE frontend on port 3200.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -42,9 +47,9 @@ Aria has a machine-readable architecture manifest at `ARCHITECTURE.json` that sh
 │  src-tauri/src/main.rs — spawns & manages Node.js   │
 │  desktop/ide.html + ide.js — Monaco-based IDE UI    │
 ├─────────────────────────────────────────────────────┤
-│  Server (Node.js)                                   │
-│  scripts/aria-server.mjs — HTTP + SSE streaming     │
-│  Port 3200 (API) + 3201 (WebSocket)                 │
+│  Server (Node.js — single process, port 3200)       │
+│  scripts/aria-server.mjs — HTTP API + SSE + static  │
+│  Braille WebSocket on port 3201                     │
 ├─────────────────────────────────────────────────────┤
 │  Agent                                              │
 │  src/agent.js — multi-turn agentic loop with tools  │
@@ -84,48 +89,50 @@ src/
   compaction.js       — Context window management
   world-model.js      — Persistent knowledge graph
   file-history.js     — File operation history with undo/redo
+  file-tracker.js     — Git-based file change tracking
   core.js             — Runtime loop engine
   bbid.js             — Behavioral biometrics identity
   index.js            — Public API exports
 
 desktop/
   ide.html            — IDE interface
-  ide.js              — Monaco editor, file tree, chat, terminal
-  ide.css             — IDE styling
+  ide.js              — Monaco editor, file tree, chat, terminal, toasts
+  ide.css             — IDE styling (incl. toast & file change animations)
+  js/file-changes.js  — File change tracker UI module
+  styles/file-changes.css — File change indicator styles
 
 scripts/
-  aria-server.mjs     — HTTP/WebSocket server (the agent's brain)
+  aria-server.mjs     — HTTP server (API + IDE frontend + file tracking)
   aria-cli.mjs        — CLI interface
-  serve-desktop.mjs   — Static dev server for the frontend
-  start-aria.sh       — Full startup script
-  install.sh          — One-line installer
 
 src-tauri/
-  src/main.rs         — Tauri commands (server lifecycle, health, introspection)
-  tauri.conf.json     — Tauri v2 configuration
+  src/main.rs         — Tauri app (auto-starts Aria server, health check)
+  tauri.conf.json     — Tauri v2 configuration (devUrl: :3200)
   Cargo.toml          — Rust dependencies
 
 ARCHITECTURE.json     — Machine-readable architecture manifest (Aria reads this)
+bootstrap.sh          — One-command setup & launch
 ```
 
 ## Install Options
 
-### Option A — bootstrap (recommended)
+### Option A — One-liner (recommended)
 
 ```bash
-git clone https://github.com/elevate-foundry/ai-native-ide.git
+git clone https://github.com/salus-ryan/ai-native-ide.git
 cd ai-native-ide
-./bootstrap.sh
+OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE ./bootstrap.sh
 ```
 
-### Option B — manual
+### Option B — Manual
 
 ```bash
-git clone https://github.com/elevate-foundry/ai-native-ide.git
+git clone https://github.com/salus-ryan/ai-native-ide.git
 cd ai-native-ide
 npm install
-npm run aria:server   # Start the backend
-npm run ide           # Start the frontend (separate terminal)
+echo "OPENROUTER_API_KEY=sk-or-v1-YOUR_KEY_HERE" > .env
+npm run aria:server
+# Open http://localhost:3200 in your browser
 ```
 
 ### Option C — Tauri desktop app
@@ -133,9 +140,22 @@ npm run ide           # Start the frontend (separate terminal)
 Requires Rust toolchain and Tauri CLI (`cargo install tauri-cli --version '^2.0.0'`).
 
 ```bash
-npm run tauri:dev     # Development mode
-npm run tauri:build   # Production bundles
+npm run tauri:dev     # Development mode (auto-starts server)
+npm run tauri:build   # Production bundle
 ```
+
+### Option D — Mobile (same WiFi)
+
+Run the one-liner on any machine, then open `http://<that-machine-ip>:3200` on your phone. The bootstrap script prints your LAN IP at startup.
+
+## UI Feedback
+
+When Aria creates, edits, or deletes files, you get clear visual feedback:
+
+- **Toast notifications** — slide-in banners (green for create, blue for edit, red for delete). Click to open the file.
+- **File tree highlights** — pulse animation on the affected file, auto-scrolls into view
+- **Tab badges** — glowing blue dot on open tabs that Aria modified
+- **Human-readable chat messages** — `✨ Created file: config.js` instead of raw JSON
 
 ## Introspection API
 
@@ -153,10 +173,10 @@ The agent can also use these as tools: `introspect_architecture`, `introspect_mo
 ## Testing
 
 ```bash
-npm test
+npm test   # 36 tests
 ```
 
-The test suite covers the core loop engine, desktop scaffold contracts, installer behavior, socket monitoring, MCP server, and documentation completeness.
+Covers the core loop engine, desktop scaffold contracts, installer behavior, socket monitoring, MCP server, and documentation completeness.
 
 ## Why This Exists
 
