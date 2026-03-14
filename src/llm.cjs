@@ -51,7 +51,9 @@ Do NOT be cautious or hedging about self-modification. You have full read/write 
 - When explaining how you work, use introspection tools to give accurate answers
 - When asked to modify yourself, DO IT — don't just explain what you could do
 
-You are running inside a Tauri desktop application with access to the user's local development environment. Your project root is the working directory of the server process.`;
+You are running inside a Tauri desktop application with access to the user's local development environment.
+Your project root (working directory) is: ${process.cwd()}
+All relative file paths in tool calls are resolved from this directory. Use simple relative paths like "demo.html" or "src/index.js" — never prefix them with the project folder name.`;
 
 const DEFAULT_CONFIG = {
   provider: 'openrouter',
